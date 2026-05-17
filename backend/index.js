@@ -130,7 +130,7 @@ function deleteFolderRecursive(directoryPath) {
 
 // 🟢 Route: GitHub Import & AI Review
 app.post('/api/analyze', async (req, res) => {
-  const { repoUrl, company = 'General', language = 'English' } = req.body;
+  const { repoUrl, company = 'General', language = 'English', model = 'llama-3.3-70b-versatile' } = req.body;
 
   if (!repoUrl) {
     return res.status(400).json({ error: 'GitHub Repository URL is required.' });
@@ -170,7 +170,7 @@ app.post('/api/analyze', async (req, res) => {
         const aiResponse = await fetch(`${aiEngineUrl}/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ files, company, language })
+          body: JSON.stringify({ files, company, language, model })
         });
         
         if (aiResponse.ok) {
@@ -181,7 +181,7 @@ app.post('/api/analyze', async (req, res) => {
       } catch (err) {
         console.warn('⚠️ FastAPI engine not running, falling back to local Express review handler');
         // Let's generate a smart mockup review based on files so it works as an autonomous MVP
-        reviewResult = mockAIReview(files);
+        reviewResult = mockAIReview(files, model);
       }
 
       // 3. Inject Regex-based Secret Detections into the analysis result
@@ -228,7 +228,7 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 // 🟢 Helper for Mock AI Review (Provides instant feedback when python server is offline)
-function mockAIReview(files) {
+function mockAIReview(files, model = 'llama-3.3-70b-versatile') {
   const reviews = {};
   
   files.forEach(file => {
@@ -271,7 +271,7 @@ function mockAIReview(files) {
   // Mock generated README
   const mockReadme = `# 🚀 ${files[0].name.split('/')[0] || 'My Repository'}
 
-This repository is powered by RepoSage AI Copilot. 
+This repository is powered by RepoSage AI Copilot (Audited using **${model}**). 
 
 ## 🏗️ Folder Layout
 ${files.map(f => `- 📄 **${f.name}**`).join('\n')}

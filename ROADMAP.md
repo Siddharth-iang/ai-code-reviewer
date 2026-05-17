@@ -15,7 +15,7 @@ Our vision is to build the ultimate open-source AI platform that helps developer
 - [x] Multi-language Expansion (Java, Go, C++, Rust, PHP, Ruby, SQL)
 - [x] Report Export functionality (Markdown Exporter)
 - [x] Security Scanner Module (Regex Secret & Credential detection)
-- [ ] AI Model selection (OpenAI, Gemini, Local Ollama)
+- [x] AI Model selection (Llama, DeepSeek, Google Gemma)
 
 ## Phase 3: Advanced Features
 - [ ] AI Chat With Repository ("Explain authentication flow")

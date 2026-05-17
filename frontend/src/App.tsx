@@ -48,6 +48,7 @@ export default function App() {
   const [repoUrl, setRepoUrl] = useState('');
   const [company, setCompany] = useState('General');
   const [language, setLanguage] = useState('English');
+  const [selectedModel, setSelectedModel] = useState('llama-3.3-70b-versatile');
   
   // Loading & Flow State
   const [isLoading, setIsLoading] = useState(false);
@@ -92,7 +93,7 @@ export default function App() {
       '🔍 Authenticating connection...',
       '📥 Cloning GitHub repository locally...',
       '📁 Traversing directory tree & parsing modules...',
-      '🧠 Running LLM analysis using Groq Llama-4-Scout...',
+      '🧠 Running LLM analysis using selected AI Model...',
       '📜 Generating custom repository README.md...',
       '🎉 Formatting reports...'
     ];
@@ -110,7 +111,7 @@ export default function App() {
       const response = await fetch('http://localhost:5000/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoUrl, company, language })
+        body: JSON.stringify({ repoUrl, company, language, model: selectedModel })
       });
 
       clearInterval(stepInterval);
@@ -302,7 +303,7 @@ export default function App() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px', textTransform: 'uppercase' }}>Target Company</label>
                   <select 
@@ -327,6 +328,20 @@ export default function App() {
                     <option value="English">English</option>
                     <option value="Hindi">Hindi</option>
                     <option value="Telugu">Telugu</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px', textTransform: 'uppercase' }}>AI Model</label>
+                  <select 
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', fontSize: '13px', outline: 'none' }}
+                  >
+                    <option value="llama-3.3-70b-versatile">Llama 3.3 (70B)</option>
+                    <option value="deepseek-r1-distill-llama-70b">DeepSeek R1 (70B)</option>
+                    <option value="llama-3.1-8b-instant">Llama 3.1 (8B)</option>
+                    <option value="gemma2-9b-it">Google Gemma 2 (9B)</option>
                   </select>
                 </div>
               </div>
