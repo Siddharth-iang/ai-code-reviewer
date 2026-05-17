@@ -2,17 +2,19 @@
 
 Our vision is to build the ultimate open-source AI platform that helps developers understand, review, document, and improve repositories faster.
 
-## Phase 1: MVP (Current)
+## Phase 1: MVP (Completed 🎉)
 - [x] Initial Open Source Structure Setup
-- [ ] Backend: GitHub Repo Import & Cloning Service
-- [ ] AI Engine: Basic Code Review & Bug Detection (Python/JS/TS)
-- [ ] AI Engine: README Generation Pipeline
-- [ ] Frontend: Simple React Dashboard UI
+- [x] Backend: GitHub Repo Import & Cloning Service
+- [x] AI Engine: Basic Code Review & Bug Detection (Python/JS/TS)
+- [x] AI Engine: README Generation Pipeline
+- [x] Frontend: Simple React Dashboard UI
+- [x] GitHub Action: AI-powered Pull Request Review Bot
+
 
 ## Phase 2: Core Enhancements
-- [ ] Multi-language Expansion (Java, Go, C++, Rust)
-- [ ] Report Export functionality (PDF/Markdown)
-- [ ] Security Scanner Module (Secret detection, vulnerabilities)
+- [x] Multi-language Expansion (Java, Go, C++, Rust, PHP, Ruby, SQL)
+- [x] Report Export functionality (Markdown Exporter)
+- [x] Security Scanner Module (Regex Secret & Credential detection)
 - [ ] AI Model selection (OpenAI, Gemini, Local Ollama)
 
 ## Phase 3: Advanced Features
