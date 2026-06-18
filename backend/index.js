@@ -19,8 +19,15 @@ import { analyzeComplexity } from './utils/complexityAnalyzer.js';
 import { deleteFolderRecursive, getFolderSize } from './utils/fileHelper.js';
 import { verifyWebhookSignature } from './utils/signatureVerifier.js';
 import { mockAIReview } from './utils/mockAIReview.js';
+import mongoose from 'mongoose';
+import Analytics from './models/Analytics.js';
 
 dotenv.config();
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/reposage';
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.warn('⚠️ MongoDB connection failed:', err.message));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -852,6 +859,53 @@ app.post('/api/reports/pdf', requireApiKey, (req, res) => {
   }
 
   doc.end();
+});
+
+// 🟢 Route: Analytics Trends — 30-day time-series of repository health scores
+app.get('/api/analytics/trends', requireApiKey, async (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const trends = await Analytics.aggregate([
+      {
+        $match: {
+          analyzedAt: { $gte: thirtyDaysAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$analyzedAt' },
+          },
+          analyses: { $sum: 1 },
+          totalFindings: { $sum: '$totalFindings' },
+          avgHealthScore: { $avg: '$healthScore' },
+          totalBugs: { $sum: '$totalBugs' },
+          totalSecurityIssues: { $sum: '$totalSecurityIssues' },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id',
+          analyses: 1,
+          totalFindings: 1,
+          avgHealthScore: { $round: ['$avgHealthScore', 1] },
+          totalBugs: 1,
+          totalSecurityIssues: 1,
+        },
+      },
+    ]);
+
+    return res.json({ trends });
+  } catch (err) {
+    console.error('❌ Analytics Trends Error:', err.message);
+    return res.status(500).json({ error: 'Failed to retrieve analytics trends.' });
+  }
 });
 
 app.listen(PORT, () => {
