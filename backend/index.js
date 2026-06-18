@@ -894,6 +894,53 @@ app.post('/api/reports/pdf', requireApiKey, (req, res) => {
   doc.end();
 });
 
+// 🟢 Route: Analytics Trends — 30-day time-series of repository health scores
+app.get('/api/analytics/trends', requireApiKey, async (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const trends = await Analytics.aggregate([
+      {
+        $match: {
+          analyzedAt: { $gte: thirtyDaysAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$analyzedAt' },
+          },
+          analyses: { $sum: 1 },
+          totalFindings: { $sum: '$totalFindings' },
+          avgHealthScore: { $avg: '$healthScore' },
+          totalBugs: { $sum: '$totalBugs' },
+          totalSecurityIssues: { $sum: '$totalSecurityIssues' },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id',
+          analyses: 1,
+          totalFindings: 1,
+          avgHealthScore: { $round: ['$avgHealthScore', 1] },
+          totalBugs: 1,
+          totalSecurityIssues: 1,
+        },
+      },
+    ]);
+
+    return res.json({ trends });
+  } catch (err) {
+    console.error('❌ Analytics Trends Error:', err.message);
+    return res.status(500).json({ error: 'Failed to retrieve analytics trends.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🟢 RepoSage Backend running on http://localhost:${PORT}`);
 });
