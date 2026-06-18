@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SettingsModal from "./components/SettingsModal";
+import { MetricsChart } from './components/MetricsChart';
 import {
   Github,
   Terminal,
@@ -21,6 +22,10 @@ import {
   Sun,
   Moon,
   Settings,
+  Clock,
+  Trash2,
+  Search,
+  X,
 } from "lucide-react";
 import mermaid from "mermaid";
 
@@ -3258,6 +3263,7 @@ export default function App() {
                                     </div>
                                   </div>
                                 </div>
+                                <MetricsChart />
                               </div>
                             );
                           })()
@@ -4081,7 +4087,7 @@ export default function App() {
         </section>
       </main>
       {showSettings && (
-        <SettingsModal theme={theme} onClose={() => setShowSettings(false)} />
+        <SettingsModal onClose={() => setShowSettings(false)} />
       )}
       {/* 🚀 Sleek Footer */}
       <footer
