@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import SettingsModal from "./components/SettingsModal";
 import { MetricsChart } from './components/MetricsChart';
 import {
@@ -7,12 +8,15 @@ import {
   ShieldAlert,
   Zap,
   Sparkles,
+  Bug,
+  FileText,
   FolderGit,
   FileCode,
   CheckCircle,
   AlertOctagon,
   AlertTriangle,
   Download,
+  FileSpreadsheet,
   Layers,
   Code2,
   MessageSquare,
@@ -28,13 +32,14 @@ import {
   X,
 } from "lucide-react";
 import mermaid from "mermaid";
+import { sanitizeForStorage } from "./utils/sanitize";
 
 // Initialize Mermaid outside the component to avoid multiple initializations
 try {
   mermaid.initialize({
     startOnLoad: false,
     theme: "dark",
-    securityLevel: "loose",
+    securityLevel: "strict",
     themeVariables: {
       background: "#0f172a",
       primaryColor: "#3b82f6",
@@ -50,7 +55,6 @@ try {
 
 // API Endpoint Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
 // Define Types
 interface ReviewItem {
   type: string;
@@ -78,6 +82,9 @@ interface BackendResponse {
   repoName: string;
   filesReviewedCount: number;
   analysis: AnalysisData;
+  _mock?: boolean;
+  _mockWarning?: string;
+  sessionId?: string;
 }
 
 interface AuditHistoryEntry {
@@ -120,7 +127,7 @@ function MermaidViewer({ chart, repoName }: MermaidViewerProps) {
         }
 
         const { svg: renderedSvg } = await mermaid.render(uniqueId, cleanChart);
-        setSvg(renderedSvg);
+        setSvg(sanitizeForStorage(renderedSvg));
       } catch (err: any) {
         console.error("Mermaid Render Error:", err);
         setError(
@@ -134,7 +141,8 @@ function MermaidViewer({ chart, repoName }: MermaidViewerProps) {
 
   const downloadSVG = () => {
     if (!svg) return;
-    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const sanitizedSvg = sanitizeForStorage(svg);
+    const blob = new Blob([sanitizedSvg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -229,9 +237,14 @@ function MermaidViewer({ chart, repoName }: MermaidViewerProps) {
           width: "100%",
         }}
         dangerouslySetInnerHTML={{
-          __html:
+          __html: DOMPurify.sanitize(
             svg ||
             '<span style="color:#9ca3af;font-size:12px;">Generating visual flowchart...</span>',
+            {
+              ALLOWED_TAGS: ['svg', 'g', 'path', 'text', 'tspan', 'rect', 'circle', 'line', 'polygon', 'polyline', 'style', 'marker', 'defs', 'span', 'br'],
+              ALLOWED_ATTR: ['id', 'class', 'style', 'd', 'x', 'y', 'width', 'height', 'rx', 'ry', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'viewBox', 'xmlns', 'marker-end', 'marker-start', 'transform', 'text-anchor', 'font-size', 'font-family', 'color']
+            }
+          ),
         }}
       />
     </div>
@@ -287,6 +300,94 @@ function CopyButton({ text, style, showText = false }: CopyButtonProps) {
   );
 }
 
+function QuickFixButton({ text, onApply }: { text: string; onApply: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleApply = () => {
+    onApply(text);
+    setApplied(true);
+    setOpen(false);
+    setTimeout(() => setApplied(false), 2000);
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: open ? "rgba(234,179,8,0.15)" : "transparent",
+          border: "none",
+          borderRadius: "4px",
+          padding: "4px 8px",
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: applied ? "#22c55e" : open ? "#eab308" : "#9ca3af",
+          transition: "all 0.2s ease",
+        }}
+        title="Quick Fix"
+      >
+        {applied ? <Check size={14} /> : <Lightbulb size={14} />}
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: "4px",
+            background: "#1e293b",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "6px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            minWidth: "160px",
+            zIndex: 1000,
+            overflow: "hidden",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleApply}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              width: "100%",
+              padding: "8px 12px",
+              border: "none",
+              background: "transparent",
+              color: "#f3f4f6",
+              fontSize: "12px",
+              fontWeight: 500,
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            <Zap size={14} style={{ color: "#eab308" }} />
+            <span>Apply AI Fix</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // Theme State
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -312,6 +413,33 @@ export default function App() {
   // Loading & Flow State
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
+
+  // Toast Notification State
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: "error" | "warning" | "info" }>>([]);
+  let toastIdCounter = useRef(0);
+  const addToast = (message: string, type: "error" | "warning" | "info" = "error") => {
+    const id = ++toastIdCounter.current;
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  };
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Offline detection
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => { setIsOffline(false); addToast("Backend connection restored.", "info"); };
+    const handleOffline = () => { setIsOffline(true); addToast("Network connection lost. Please check your internet.", "error"); };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   // Response & View State
   const [analysisResult, setAnalysisResult] = useState<BackendResponse | null>(
@@ -345,10 +473,70 @@ export default function App() {
     "preview",
   );
 
+  // Batch Analysis Queue State
+  const [queuedRepos, setQueuedRepos] = useState<Array<{
+    id: string;
+    url: string;
+    status: 'queued' | 'analyzing' | 'done' | 'failed';
+    response?: BackendResponse;
+    error?: string;
+  }>>(() => {
+    try {
+      // Allow fallback to eposage_batch_results just in case
+      const saved = localStorage.getItem('reposage_batch_results') || localStorage.getItem('eposage_batch_results');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((r: any) => 
+          r.status === 'analyzing' ? { ...r, status: 'failed', error: 'Analysis interrupted by reload' } : r
+        );
+      }
+    } catch (e) {
+      console.error('Failed to load batch results:', e);
+    }
+    return [];
+  });
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const [activeRepoId, setActiveRepoId] = useState<string | null>(() => {
+    return localStorage.getItem('reposage_active_repo_id') || null;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('reposage_batch_results', JSON.stringify(queuedRepos));
+    // Also save under requested key just in case testing relies on it
+    localStorage.setItem('eposage_batch_results', JSON.stringify(queuedRepos));
+  }, [queuedRepos]);
+
+  useEffect(() => {
+    if (activeRepoId) {
+      localStorage.setItem('reposage_active_repo_id', activeRepoId);
+    } else {
+      localStorage.removeItem('reposage_active_repo_id');
+    }
+  }, [activeRepoId]);
+
+  // Refs for batch analysis to avoid stale closures
+  const queuedReposRef = useRef(queuedRepos);
+  queuedReposRef.current = queuedRepos;
+  const activeSetRef = useRef(false);
+  const abortControllersRef = useRef<AbortController[]>([]);
+
+  // Cleanup abort controllers on unmount
+  useEffect(() => {
+    return () => {
+      abortControllersRef.current.forEach(ac => ac.abort());
+      abortControllersRef.current = [];
+    };
+  }, []);
+
+  // Derive the currently displayed result (batch or single)
+  const activeResult = activeRepoId
+    ? queuedRepos.find(r => r.id === activeRepoId)?.response ?? null
+    : analysisResult;
 
   // Simple markdown compiler for premium preview rendering
   const renderMarkdown = (md: string) => {
-    const lines = md.split("\n");
+    const sanitized = DOMPurify.sanitize(md);
+    const lines = sanitized.split("\n");
     let inCodeBlock = false;
     let codeBlockLines: string[] = [];
 
@@ -546,6 +734,12 @@ export default function App() {
   ) => {
     if (!analysisResult) return;
 
+    // Disable issue creation for mock/placeholder findings
+    if (analysisResult._mock) {
+      addToast('Cannot create GitHub issues for placeholder findings. Please connect the AI Engine for real analysis.', 'warning');
+      return;
+    }
+
     setCreatingIssues((prev) => ({ ...prev, [itemKey]: true }));
 
     const title = `[AI Finding] ${category.toUpperCase()}: ${item.type} in ${file} (Line ${item.line})`;
@@ -564,25 +758,8 @@ export default function App() {
       `---\n` +
       `*Generated automatically by **RepoSage AI Copilot**.*`;
 
-    <button
-      onClick={() => setShowSettings(true)}
-      style={{
-        background: "rgba(255,255,255,0.05)",
-        border: "1px solid var(--border-color)",
-        borderRadius: "6px",
-        padding: "6px 10px",
-        cursor: "pointer",
-        color: "var(--text-color)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Settings size={15} />
-    </button>;
-
     const labels = isGssocLabelingEnabled
-      ? ["gssoc26", "good-first-issue", category]
+      ? ["gssoc26", category]
       : [category];
 
     try {
@@ -590,7 +767,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY,
+          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY
         },
         body: JSON.stringify({
           repoUrl,
@@ -613,7 +790,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      alert(`Error creating issue: ${err.message}`);
+      addToast(`Error creating issue: ${err.message}`);
     } finally {
       setCreatingIssues((prev) => ({ ...prev, [itemKey]: false }));
     }
@@ -628,6 +805,8 @@ export default function App() {
     Array<{ role: "user" | "assistant"; content: string }>
   >([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [useRag, setUseRag] = useState(false);
 
   const handleSendChatMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -643,12 +822,14 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY,
+          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY
         },
         body: JSON.stringify({
           message: userMessage,
           history: chatHistory,
           model: selectedModel,
+          sessionId,
+          useRag,
         }),
       });
 
@@ -663,6 +844,7 @@ export default function App() {
       ]);
     } catch (err: any) {
       console.error(err);
+      addToast(err.message || "Chat service unavailable. Check backend connection.", "error");
       setChatHistory((prev) => [
         ...prev,
         {
@@ -758,6 +940,18 @@ export default function App() {
 
   const persistAuditHistory = (result: BackendResponse) => {
     const totalFindings = calculateTotalFindings(result);
+    const sanitizedResult = {
+      ...result,
+      analysis: {
+        ...result.analysis,
+        mermaidDiagram: result.analysis.mermaidDiagram
+          ? sanitizeForStorage(result.analysis.mermaidDiagram)
+          : undefined,
+        generatedReadme: result.analysis.generatedReadme
+          ? result.analysis.generatedReadme
+          : '',
+      },
+    };
     const entry: AuditHistoryEntry = {
       id: `${result.repoName}-${Date.now()}`,
       repoUrl,
@@ -765,7 +959,7 @@ export default function App() {
       auditedAt: new Date().toISOString(),
       totalFindings,
       overallGrade: getAuditGrade(totalFindings),
-      response: result
+      response: sanitizedResult
     };
 
     setAuditHistory(prev => {
@@ -779,15 +973,24 @@ export default function App() {
   };
 
   const loadAuditFromHistory = (entry: AuditHistoryEntry) => {
+    const safeResponse = {
+      ...entry.response,
+      analysis: {
+        ...entry.response.analysis,
+        mermaidDiagram: entry.response.analysis.mermaidDiagram
+          ? sanitizeForStorage(entry.response.analysis.mermaidDiagram)
+          : undefined,
+      },
+    };
     setRepoUrl(entry.repoUrl);
-    setAnalysisResult(entry.response);
+    setAnalysisResult(safeResponse);
     setApiError(null);
     setIsLoading(false);
     setActiveDashboardView('audit');
     setFileFilterQuery('');
     setActiveExtFilter('All');
 
-    const filesList = Object.keys(entry.response.analysis.fileReviews || {});
+    const filesList = Object.keys(safeResponse.analysis.fileReviews || {});
     setSelectedFile(filesList[0] || null);
   };
 
@@ -833,7 +1036,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY,
+          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY
         },
         body: JSON.stringify({
           repoUrl,
@@ -843,6 +1046,7 @@ export default function App() {
           temperature: aiSettings.temperature ?? 0.7,
           maxTokens: aiSettings.maxTokens ?? 2048,
           systemPrompt: aiSettings.systemPrompt ?? "",
+          batchSize: aiSettings.batchSize ?? 5,
         }),
       });
 
@@ -857,6 +1061,9 @@ export default function App() {
 
       const data: BackendResponse = await response.json();
       setAnalysisResult(data);
+      if (data.sessionId) {
+        setSessionId(data.sessionId);
+      }
       persistAuditHistory(data);
       
       // Select the first file reviewed automatically
@@ -866,25 +1073,143 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      setApiError(
-        err.message ||
-          "Could not connect to the backend server. Make sure node backend is running on port 5000.",
-      );
+      const errorMsg = err.message || "Could not connect to the backend server. Make sure node backend is running on port 5000.";
+      setApiError(errorMsg);
+      addToast(errorMsg, "error");
     } finally {
       clearInterval(stepInterval);
       setIsLoading(false);
     }
   };
 
+  // Batch Analysis: analyze all queued repos sequentially
+  const runBatchAnalysis = async () => {
+    if (queuedRepos.length === 0) return;
+    setIsBatchRunning(true);
+    setIsLoading(true);
+    setApiError(null);
+    setAnalysisResult(null);
+    setSelectedFile(null);
+    activeSetRef.current = false;
+
+    const aiSettings = JSON.parse(
+      localStorage.getItem("reposage_ai_settings") || "{}"
+    );
+
+    // Take a snapshot of the queue at start time
+    const snapshot = queuedReposRef.current;
+
+    for (const repo of snapshot) {
+      // Skip if this repo was removed from the queue mid-batch
+      if (!queuedReposRef.current.some(r => r.id === repo.id)) continue;
+
+      const controller = new AbortController();
+      abortControllersRef.current.push(controller);
+
+      setQueuedRepos(prev =>
+        prev.map(r => r.id === repo.id ? { ...r, status: 'analyzing' } : r)
+      );
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            repoUrl: repo.url,
+            company,
+            language,
+            model: selectedModel,
+            temperature: aiSettings.temperature ?? 0.7,
+            maxTokens: aiSettings.maxTokens ?? 2048,
+            systemPrompt: aiSettings.systemPrompt ?? "",
+            batchSize: aiSettings.batchSize ?? 5,
+          }),
+        });
+
+        // Skip if repo was removed while fetch was in-flight
+        if (!queuedReposRef.current.some(r => r.id === repo.id)) continue;
+
+        if (response.ok) {
+          const data: BackendResponse = await response.json();
+          setQueuedRepos(prev =>
+            prev.map(r => r.id === repo.id ? { ...r, status: 'done', response: data } : r)
+          );
+          if (!activeSetRef.current) {
+            activeSetRef.current = true;
+            setActiveRepoId(repo.id);
+            setAnalysisResult(data);
+            const filesList = Object.keys(data.analysis.fileReviews);
+            if (filesList.length > 0) setSelectedFile(filesList[0]);
+          }
+        } else {
+          const errText = await response.text();
+          setQueuedRepos(prev =>
+            prev.map(r => r.id === repo.id ? { ...r, status: 'failed', error: errText } : r)
+          );
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') continue;
+        if (!queuedReposRef.current.some(r => r.id === repo.id)) continue;
+        setQueuedRepos(prev =>
+          prev.map(r => r.id === repo.id ? { ...r, status: 'failed', error: err.message } : r)
+        );
+      } finally {
+        abortControllersRef.current = abortControllersRef.current.filter(ac => ac !== controller);
+      }
+    }
+
+    setIsBatchRunning(false);
+    setIsLoading(false);
+  };
+
+  // Add a repo URL to the batch queue
+  const addToQueue = () => {
+    const url = repoUrl.trim();
+    if (!url) return;
+    const exists = queuedRepos.some(r => r.url === url);
+    if (exists) return;
+    setQueuedRepos(prev => [
+      ...prev,
+      { id: `repo-${Date.now()}`, url, status: 'queued' },
+    ]);
+    setRepoUrl('');
+  };
+
+  const removeFromQueue = (id: string) => {
+    setQueuedRepos(prev => {
+      const remaining = prev.filter(r => r.id !== id);
+      if (activeRepoId === id) {
+        const done = remaining.find(r => r.status === 'done');
+        if (done) {
+          setTimeout(() => {
+            setActiveRepoId(done.id);
+            setAnalysisResult(done.response ?? null);
+          }, 0);
+        } else {
+          setTimeout(() => {
+            setActiveRepoId(null);
+            setAnalysisResult(null);
+          }, 0);
+        }
+      }
+      return remaining;
+    });
+  };
+
   // Helper to trigger README download
   const downloadReadme = () => {
-    if (!analysisResult) return;
+    const result = activeResult ?? analysisResult;
+    if (!result) return;
     const element = document.createElement("a");
-    const file = new Blob([analysisResult.analysis.generatedReadme], {
+    const file = new Blob([result.analysis.generatedReadme], {
       type: "text/plain",
     });
     element.href = URL.createObjectURL(file);
-    element.download = "GENERATED_README.md";
+    element.download = `${result.repoName}_README.md`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -892,12 +1217,13 @@ export default function App() {
 
   // Helper to compile and download complete Code Audit Report in Markdown format
   const downloadAuditReport = () => {
-    if (!analysisResult) return;
+    const result = activeResult ?? analysisResult;
+    if (!result) return;
 
     let md = `# 🛡️ RepoSage AI Code Review & Audit Report\n\n`;
-    md += `* **Repository**: ${analysisResult.repoName}\n`;
+    md += `* **Repository**: ${result.repoName}\n`;
     md += `* **Date**: ${new Date().toLocaleDateString()}\n`;
-    md += `* **Total Modules Scanned**: ${analysisResult.filesReviewedCount} files\n\n`;
+    md += `* **Total Modules Scanned**: ${result.filesReviewedCount} files\n\n`;
 
     md += `## 📊 Overall Code Health Summary\n\n`;
     let totalBugs = 0;
@@ -905,8 +1231,8 @@ export default function App() {
     let totalPerf = 0;
     let totalStyle = 0;
 
-    Object.keys(analysisResult.analysis.fileReviews).forEach((file) => {
-      const review = analysisResult.analysis.fileReviews[file];
+    Object.keys(result.analysis.fileReviews).forEach((file) => {
+      const review = result.analysis.fileReviews[file];
       totalBugs += review.bugs?.length || 0;
       totalSecurity += review.security?.length || 0;
       totalPerf += review.optimization?.length || 0;
@@ -923,8 +1249,8 @@ export default function App() {
     md += `---\n\n`;
     md += `## 🔍 File-by-File Audit Details\n\n`;
 
-    Object.keys(analysisResult.analysis.fileReviews).forEach((file) => {
-      const review = analysisResult.analysis.fileReviews[file];
+    Object.keys(result.analysis.fileReviews).forEach((file) => {
+      const review = result.analysis.fileReviews[file];
       const hasIssues =
         (review.bugs?.length || 0) +
           (review.security?.length || 0) +
@@ -976,36 +1302,37 @@ export default function App() {
     });
 
     md += `## 📄 Generated README.md\n\n`;
-    md += analysisResult.analysis.generatedReadme;
+    md += result.analysis.generatedReadme;
 
     const element = document.createElement("a");
     const fileBlob = new Blob([md], { type: "text/plain" });
     element.href = URL.createObjectURL(fileBlob);
-    element.download = `${analysisResult.repoName}_AUDIT_REPORT.md`;
+    element.download = `${result.repoName}_AUDIT_REPORT.md`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
   };
 
   const downloadHTMLReport = async () => {
-    if (!analysisResult) return;
+    const result = activeResult ?? analysisResult;
+    if (!result) return;
     try {
       const response = await fetch(`${API_BASE_URL}/api/reports/html`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY,
+          "x-api-key": import.meta.env.VITE_REPOSAGE_API_KEY
         },
         body: JSON.stringify({
-          repoName: analysisResult.repoName,
-          analysis: analysisResult.analysis,
+          repoName: result.repoName,
+          analysis: result.analysis,
         }),
       });
       if (response.ok) {
         const htmlBlob = await response.blob();
         const element = document.createElement("a");
         element.href = URL.createObjectURL(htmlBlob);
-        element.download = `${analysisResult.repoName}_AUDIT_REPORT.html`;
+        element.download = `${result.repoName}_AUDIT_REPORT.html`;
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
@@ -1018,7 +1345,8 @@ export default function App() {
   };
 
   const downloadPDFReport = async () => {
-    if (!analysisResult) return;
+    const result = activeResult ?? analysisResult;
+    if (!result) return;
     try {
       const response = await fetch(`${API_BASE_URL}/api/reports/pdf`, {
         method: 'POST',
@@ -1027,15 +1355,15 @@ export default function App() {
           'x-api-key': import.meta.env.VITE_REPOSAGE_API_KEY
         },
         body: JSON.stringify({
-          repoName: analysisResult.repoName,
-          analysis: analysisResult.analysis
+          repoName: result.repoName,
+          analysis: result.analysis
         })
       });
       if (response.ok) {
         const pdfBlob = await response.blob();
         const element = document.createElement("a");
         element.href = URL.createObjectURL(pdfBlob);
-        element.download = `${analysisResult.repoName}_AUDIT_REPORT.pdf`;
+        element.download = `${result.repoName}_AUDIT_REPORT.pdf`;
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
@@ -1047,6 +1375,42 @@ export default function App() {
     }
   };
 
+  const downloadCSVReport = () => {
+    const result = activeResult ?? analysisResult;
+    if (!result) return;
+
+    const rows: string[][] = [];
+    rows.push(["File", "Category", "Type", "Line", "Description", "Suggestion"]);
+
+    Object.keys(result.analysis.fileReviews).forEach((file) => {
+      const review = result.analysis.fileReviews[file];
+      (review.bugs || []).forEach((item: { line: number; type: string; description: string; suggestion: string }) =>
+        rows.push([file, "Bug", item.type, String(item.line), item.description, item.suggestion])
+      );
+      (review.security || []).forEach((item: { line: number; type: string; description: string; suggestion: string }) =>
+        rows.push([file, "Security", item.type, String(item.line), item.description, item.suggestion])
+      );
+      (review.optimization || []).forEach((item: { line: number; type: string; description: string; suggestion: string }) =>
+        rows.push([file, "Optimization", item.type, String(item.line), item.description, item.suggestion])
+      );
+      (review.styling || []).forEach((item: { line: number; type: string; description: string; suggestion: string }) =>
+        rows.push([file, "Styling", item.type, String(item.line), item.description, item.suggestion])
+      );
+    });
+
+    const csvContent = rows.map((r) =>
+      r.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")
+    ).join("\n");
+
+    const element = document.createElement("a");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    element.href = URL.createObjectURL(blob);
+    element.download = `${result.repoName}_FINDINGS.csv`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
   return (
     <div
       style={{
@@ -1056,6 +1420,61 @@ export default function App() {
         boxSizing: "border-box",
       }}
     >
+      {/* Toast notifications (like VS Code showErrorMessage) */}
+      {toasts.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            top: "16px",
+            right: "16px",
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            maxWidth: "400px",
+          }}
+        >
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              style={{
+                background: toast.type === "error" ? "rgba(239, 68, 68, 0.95)" : toast.type === "warning" ? "rgba(245, 158, 11, 0.95)" : "rgba(59, 130, 246, 0.95)",
+                color: "#fff",
+                padding: "12px 16px",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: 500,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "10px",
+                backdropFilter: "blur(8px)",
+                border: toast.type === "error" ? "1px solid rgba(239, 68, 68, 0.5)" : toast.type === "warning" ? "1px solid rgba(245, 158, 11, 0.5)" : "1px solid rgba(59, 130, 246, 0.5)",
+                animation: "toast-slide-in 0.3s ease-out",
+              }}
+            >
+              {toast.type === "error" ? <AlertOctagon size={16} style={{ flexShrink: 0, marginTop: "1px" }} /> : toast.type === "warning" ? <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: "1px" }} /> : <AlertOctagon size={16} style={{ flexShrink: 0, marginTop: "1px" }} />}
+              <span style={{ flex: 1 }}>{toast.message}</span>
+              <button
+                onClick={() => removeToast(toast.id)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "rgba(255,255,255,0.7)",
+                  cursor: "pointer",
+                  padding: "0",
+                  fontSize: "14px",
+                  lineHeight: 1,
+                  flexShrink: 0,
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 🚀 Modern Navbar */}
       <header
         className="glass-panel"
@@ -1168,10 +1587,18 @@ export default function App() {
               >
                 <Download size={14} /> Export PDF
               </button>
+              <button
+                onClick={downloadCSVReport}
+                style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#3b82f6', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s' }}
+              >
+                <FileSpreadsheet size={14} /> Export CSV
+              </button>
             </>
           )}
           <button
             onClick={() => setShowSettings(true)}
+            aria-label="Open AI Settings"
+            title="AI Settings"
             style={{
               background: "rgba(255,255,255,0.05)",
               border: "1px solid var(--border-color)",
@@ -1225,6 +1652,24 @@ export default function App() {
           >
             <Github size={18} /> Codebase
           </a>
+          {isOffline && (
+            <span
+              style={{
+                fontSize: "11px",
+                background: "#ef4444",
+                color: "#fff",
+                fontWeight: 700,
+                padding: "3px 10px",
+                borderRadius: "20px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff", display: "inline-block" }} />
+              Offline
+            </span>
+          )}
           <span
             style={{
               fontSize: "12px",
@@ -1291,7 +1736,6 @@ export default function App() {
                 </label>
                 <input
                   type="url"
-                  required
                   placeholder="https://github.com/username/repo"
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
@@ -1307,6 +1751,133 @@ export default function App() {
                     boxSizing: "border-box",
                   }}
                 />
+                {/* Batch Queue Controls */}
+                <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                  <button
+                    type="button"
+                    onClick={addToQueue}
+                    disabled={!repoUrl.trim() || isLoading}
+                    style={{
+                      flex: 1,
+                      padding: "6px",
+                      background: "rgba(168,85,247,0.1)",
+                      border: "1px solid rgba(168,85,247,0.3)",
+                      borderRadius: "6px",
+                      color: "#c084fc",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      cursor: repoUrl.trim() && !isLoading ? "pointer" : "not-allowed",
+                      opacity: repoUrl.trim() && !isLoading ? 1 : 0.5,
+                    }}
+                  >
+                    + Add to Queue
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isLoading || isBatchRunning}
+                    className="glow-btn"
+                    style={{
+                      flex: 1,
+                      padding: "6px",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    {isLoading ? (
+                      <><span className="spin-slow" style={{ display: "inline-block", width: "12px", height: "12px", border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }}></span>Analyzing</>
+                    ) : (
+                      <><Sparkles size={14} /> Scan Now</>
+                    )}
+                  </button>
+                </div>
+                {/* Queued Repos List */}
+                {queuedRepos.length > 0 && (
+                  <div style={{ marginTop: "4px" }}>
+                    <div style={{ fontSize: "10px", fontWeight: 600, color: "#9ca3af", marginBottom: "6px", textTransform: "uppercase" }}>
+                      Queue ({queuedRepos.length}) —
+                      <button
+                        type="button"
+                        onClick={runBatchAnalysis}
+                        disabled={isBatchRunning}
+                        style={{
+                          marginLeft: "6px",
+                          background: "rgba(34,197,94,0.1)",
+                          border: "1px solid rgba(34,197,94,0.3)",
+                          borderRadius: "4px",
+                          color: "#4ade80",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          cursor: isBatchRunning ? "not-allowed" : "pointer",
+                          opacity: isBatchRunning ? 0.5 : 1,
+                        }}
+                      >
+                        {isBatchRunning ? `Running (${queuedRepos.filter(r => r.status === 'done').length}/${queuedRepos.length})` : `Run Batch Analysis`}
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "140px", overflowY: "auto" }}>
+                      {queuedRepos.map(repo => {
+                        const repoName = repo.url.split('/').pop()?.replace('.git', '') || repo.url;
+                        return (
+                          <div
+                            key={repo.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "4px 8px",
+                              background: activeRepoId === repo.id ? "rgba(168,85,247,0.15)" : "rgba(15,23,42,0.3)",
+                              border: `1px solid ${activeRepoId === repo.id ? "rgba(168,85,247,0.4)" : "rgba(255,255,255,0.05)"}`,
+                              borderRadius: "6px",
+                              cursor: repo.status === 'done' ? "pointer" : "default",
+                            }}
+                            onClick={() => {
+                              if (repo.status === 'done' && repo.response) {
+                                setActiveRepoId(repo.id);
+                                setAnalysisResult(repo.response);
+                                const files = Object.keys(repo.response.analysis.fileReviews);
+                                if (files.length > 0) setSelectedFile(files[0]);
+                              }
+                            }}
+                          >
+                            <span style={{
+                              fontSize: "8px",
+                              fontWeight: 700,
+                              color: repo.status === 'done' ? "#22c55e" : repo.status === 'failed' ? "#ef4444" : repo.status === 'analyzing' ? "#f59e0b" : "#9ca3af",
+                              width: "40px",
+                              textAlign: "center",
+                            }}>
+                              {repo.status === 'queued' ? 'WAIT' : repo.status === 'analyzing' ? 'RUN' : repo.status === 'done' ? 'DONE' : 'FAIL'}
+                            </span>
+                            <span style={{ flex: 1, fontSize: "11px", color: "var(--text-color)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {repoName}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeFromQueue(repo.id); }}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#9ca3af",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                                padding: "0 2px",
+                                lineHeight: 1,
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div
@@ -1422,44 +1993,6 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="glow-btn"
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  marginTop: "6px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                }}
-              >
-                {isLoading ? (
-                  <>
-                    <span
-                      className="spin-slow"
-                      style={{
-                        display: "inline-block",
-                        width: "14px",
-                        height: "14px",
-                        border: "2px solid white",
-                        borderTopColor: "transparent",
-                        borderRadius: "50%",
-                      }}
-                    ></span>
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} /> Scan & Document Repo
-                  </>
-                )}
-              </button>
             </form>
           </div>
 
@@ -2016,7 +2549,7 @@ export default function App() {
             </div>
           )}
 
-          {/* 3. Welcome / Sandbox Guide (When no scan has occurred yet) */}
+          {/* 3. Empty-State Dashboard (When no scan has occurred yet) */}
           {!isLoading && !analysisResult && (
             <div
               className="glass-panel"
@@ -2024,31 +2557,37 @@ export default function App() {
                 flexGrow: 1,
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
                 padding: "40px",
-                textAlign: "center",
-                gap: "24px",
+                gap: "32px",
               }}
             >
+              {/* Hero Section */}
               <div
                 style={{
-                  background: "rgba(59, 130, 246, 0.1)",
-                  padding: "16px",
-                  borderRadius: "50%",
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
-                  justifyContent: "center",
+                  textAlign: "center",
+                  gap: "16px",
                 }}
               >
-                <Code2 size={48} style={{ color: "#3b82f6" }} />
-              </div>
-              <div style={{ maxWidth: "500px" }}>
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(168,85,247,0.15))",
+                    padding: "20px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Code2 size={48} style={{ color: "#3b82f6" }} />
+                </div>
                 <h2
                   style={{
-                    fontSize: "20px",
+                    fontSize: "24px",
                     fontWeight: 700,
-                    margin: "0 0 10px 0",
+                    margin: 0,
                     color: "#f3f4f6",
                   }}
                 >
@@ -2056,22 +2595,203 @@ export default function App() {
                 </h2>
                 <p
                   style={{
-                    margin: "0 0 20px 0",
+                    margin: 0,
                     fontSize: "14px",
                     color: "#9ca3af",
-                    lineHeight: 1.5,
+                    lineHeight: 1.6,
+                    maxWidth: "520px",
                   }}
                 >
-                  Enter a public GitHub repository link on the left panel to
-                  trigger a complete multi-file AI evaluation. Our service
-                  clones the codebase, audits variables for null risks or
-                  hardcoded credentials, and outputs an automated custom
-                  README.md structure.
+                  Enter a public GitHub repository URL in the left panel to
+                  trigger a complete multi-file AI evaluation. RepoSage clones
+                  the codebase, scans for bugs, security threats, and
+                  performance issues, then generates a custom README.
                 </p>
+              </div>
+
+              {/* Feature Cards */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "12px",
+                }}
+              >
+                {[
+                  {
+                    icon: ShieldAlert,
+                    label: "Security Scan",
+                    desc: "API leaks, hardcoded credentials, SQL injection",
+                  },
+                  {
+                    icon: Bug,
+                    label: "Bug Detection",
+                    desc: "Logical errors, null references, edge cases",
+                  },
+                  {
+                    icon: Zap,
+                    label: "Performance",
+                    desc: "Slow code, memory issues, optimization tips",
+                  },
+                  {
+                    icon: FileText,
+                    label: "Auto README",
+                    desc: "Generate professional documentation",
+                  },
+                ].map((feat) => (
+                  <div
+                    key={feat.label}
+                    style={{
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: "10px",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <feat.icon size={24} style={{ color: "#3b82f6" }} />
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "13px",
+                        color: "#e5e7eb",
+                      }}
+                    >
+                      {feat.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "#6b7280",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {feat.desc}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Quick Start Steps */}
+              <div
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "12px",
+                  padding: "20px",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: "0 0 16px 0",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#d1d5db",
+                  }}
+                >
+                  Quick Start
+                </h3>
                 <div
                   style={{
                     display: "flex",
-                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  {[
+                    {
+                      step: "1",
+                      title: "Enter a Repository URL",
+                      desc: "Paste a public GitHub repo link in the left panel",
+                    },
+                    {
+                      step: "2",
+                      title: "Configure Settings",
+                      desc: "Optionally set company persona, language, and model",
+                    },
+                    {
+                      step: "3",
+                      title: "Run Analysis",
+                      desc: "Click Analyze and review security, bug, and performance reports",
+                    },
+                  ].map((s) => (
+                    <div
+                      key={s.step}
+                      style={{
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "26px",
+                          height: "26px",
+                          borderRadius: "50%",
+                          background: "rgba(59,130,246,0.2)",
+                          color: "#3b82f6",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {s.step}
+                      </div>
+                      <div>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: "13px",
+                            color: "#e5e7eb",
+                          }}
+                        >
+                          {s.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "#6b7280",
+                            marginTop: "2px",
+                          }}
+                        >
+                          {s.desc}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sample Repos */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "12px",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "1px",
+                  }}
+                >
+                  Try a Sample Repo
+                </span>
+                <div
+                  style={{
+                    display: "flex",
                     gap: "10px",
                   }}
                 >
@@ -2084,14 +2804,15 @@ export default function App() {
                       background: "rgba(255,255,255,0.05)",
                       color: "#d1d5db",
                       border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "6px",
-                      padding: "8px 16px",
-                      fontSize: "12px",
+                      borderRadius: "8px",
+                      padding: "10px 18px",
+                      fontSize: "13px",
                       fontWeight: 600,
                       cursor: "pointer",
+                      transition: "all 0.15s",
                     }}
                   >
-                    💡 Load Sample: Guava
+                    Load Sample: Guava
                   </button>
                   <button
                     onClick={() => {
@@ -2102,14 +2823,15 @@ export default function App() {
                       background: "rgba(255,255,255,0.05)",
                       color: "#d1d5db",
                       border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "6px",
-                      padding: "8px 16px",
-                      fontSize: "12px",
+                      borderRadius: "8px",
+                      padding: "10px 18px",
+                      fontSize: "13px",
                       fontWeight: 600,
                       cursor: "pointer",
+                      transition: "all 0.15s",
                     }}
                   >
-                    💡 Load Sample: AuraCore
+                    Load Sample: AuraCore
                   </button>
                 </div>
               </div>
@@ -2127,6 +2849,46 @@ export default function App() {
                 boxSizing: "border-box",
               }}
             >
+              <RepositorySummaryCard result={activeResult ?? analysisResult} />
+              <HealthScoreGauge fileReviews={(activeResult ?? analysisResult)?.analysis?.fileReviews || {}} />
+              <TotalIssuesKpiCard fileReviews={(activeResult ?? analysisResult)?.analysis?.fileReviews || {}} />
+              <RepositoryOverview
+                files={Object.keys(analysisResult.analysis.fileReviews).map((filePath) => {
+                  const ext = filePath.split('.').pop()?.toLowerCase() || 'other';
+                  const m: any = analysisResult.analysis.metrics?.[filePath] || {};
+                  return {
+                    extension:    ext,
+                    totalLines:   m.totalLines   || 0,
+                    codeLines:    m.codeLines    || 0,
+                    commentLines: m.commentLines || 0,
+                    emptyLines:   m.emptyLines   || 0,
+                  };
+                })}
+            />
+              {/* Mock warning banner */}
+              {analysisResult._mock && (
+                <div
+                  style={{
+                    background: "rgba(245, 158, 11, 0.1)",
+                    border: "1px solid rgba(245, 158, 11, 0.3)",
+                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    color: "#fbbf24",
+                    fontSize: "12px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "10px",
+                  }}
+                >
+                  <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+                  <div>
+                    <strong style={{ display: "block", marginBottom: "2px" }}>
+                      ⚠️ Placeholder Analysis
+                    </strong>
+                    {analysisResult._mockWarning || "AI Engine is unavailable. These findings are placeholder suggestions and may not reflect actual code."}
+                  </div>
+                </div>
+              )}
               {/* Dashboard View Selection Tabs */}
               <div style={{ display: "flex", gap: "10px" }}>
                 <button
@@ -2411,6 +3173,96 @@ export default function App() {
 
                 {activeDashboardView === "audit" && (
                   <>
+                    {/* Repository Overview: File Extension & Code Composition Charts */}
+                    {(analysisResult || queuedRepos.some(r => r.status === 'done')) && (() => {
+                      const files = (activeResult ?? analysisResult)?.analysis?.fileReviews ?? {};
+                      const metrics = (activeResult ?? analysisResult)?.analysis?.metrics ?? {};
+
+                      // Aggregate language distribution
+                      const extCounts: Record<string, number> = {};
+                      Object.keys(files).forEach(filePath => {
+                        const ext = filePath.split('.').pop()?.toLowerCase() || 'other';
+                        extCounts[ext] = (extCounts[ext] || 0) + 1;
+                      });
+                      const totalFiles = Object.keys(files).length || 1;
+                      const sortedExts = Object.entries(extCounts).sort((a, b) => b[1] - a[1]);
+
+                      // Aggregate line ratios across all files
+                      let sumCode = 0, sumComments = 0, sumEmpty = 0, sumTotal = 0;
+                      Object.values(metrics).forEach((m: any) => {
+                        sumCode += m.codeLines || 0;
+                        sumComments += m.commentLines || 0;
+                        sumEmpty += m.emptyLines || 0;
+                        sumTotal += m.totalLines || 0;
+                      });
+
+                      const langColors: Record<string, string> = {
+                        js: '#f7df1e', ts: '#3178c6', tsx: '#3178c6', jsx: '#61dafb',
+                        py: '#3776ab', go: '#00add8', rs: '#dea584', java: '#ed8b00',
+                        cpp: '#00599c', cs: '#239120', php: '#777bb4', rb: '#cc342d',
+                        html: '#e34f26', css: '#1572b6', sql: '#336791', other: '#9ca3af',
+                      };
+
+                      const codePct = sumTotal > 0 ? Math.round((sumCode / sumTotal) * 100) : 0;
+                      const commentPct = sumTotal > 0 ? Math.round((sumComments / sumTotal) * 100) : 0;
+                      const emptyPct = sumTotal > 0 ? Math.round((sumEmpty / sumTotal) * 100) : 0;
+
+                      return (
+                        <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '16px' }}>
+                          <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-color)', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Layers size={16} style={{ color: '#a855f7' }} />
+                            Repository Overview
+                          </h3>
+                          {/* Language Composition Bar */}
+                          <div style={{ marginBottom: '14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--subtext-color)', marginBottom: '6px', fontWeight: 600 }}>
+                              <span>Language Distribution</span>
+                              <span>{Object.keys(files).length} files</span>
+                            </div>
+                            <div style={{ display: 'flex', height: '14px', borderRadius: '8px', overflow: 'hidden', gap: '1px' }}>
+                              {sortedExts.map(([ext, count]) => {
+                                const pct = Math.round((count / totalFiles) * 100);
+                                return (
+                                  <div key={ext} title={`${ext}: ${count} files (${pct}%)`} style={{ width: `${pct}%`, background: langColors[ext] || '#9ca3af', minWidth: pct > 0 ? '4px' : '0' }} />
+                                );
+                              })}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                              {sortedExts.map(([ext, count]) => {
+                                const pct = Math.round((count / totalFiles) * 100);
+                                return (
+                                  <span key={ext} style={{ fontSize: '10px', color: 'var(--subtext-color)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: langColors[ext] || '#9ca3af', display: 'inline-block' }} />
+                                    {ext.toUpperCase()} {pct}%
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {/* Code vs Comments vs Empty Bar */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--subtext-color)', marginBottom: '6px', fontWeight: 600 }}>
+                              <span>Code Composition</span>
+                              <span>{sumTotal.toLocaleString()} total lines</span>
+                            </div>
+                            <div style={{ display: 'flex', height: '14px', borderRadius: '8px', overflow: 'hidden', gap: '1px' }}>
+                              <div style={{ width: `${codePct}%`, background: '#22c55e', minWidth: codePct > 0 ? '4px' : '0' }} title={`Code: ${codePct}%`} />
+                              <div style={{ width: `${commentPct}%`, background: '#3b82f6', minWidth: commentPct > 0 ? '4px' : '0' }} title={`Comments: ${commentPct}%`} />
+                              <div style={{ width: `${emptyPct}%`, background: 'rgba(255,255,255,0.08)', minWidth: emptyPct > 0 ? '4px' : '0' }} title={`Empty: ${emptyPct}%`} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                              {[['#22c55e', 'Code', codePct, sumCode], ['#3b82f6', 'Comments', commentPct, sumComments], ['rgba(255,255,255,0.2)', 'Empty', emptyPct, sumEmpty]].map(([color, label, pct, lines]) => (
+                                <span key={String(label)} style={{ fontSize: '10px', color: 'var(--subtext-color)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: color as string, display: 'inline-block' }} />
+                                  {String(label)} {String(pct)}% ({Number(lines).toLocaleString()})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Central Audit Hub */}
                     <div
                       className="glass-panel"
@@ -3354,19 +4206,36 @@ export default function App() {
                                   >
                                     <span
                                       style={{
-                                        display: "block",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "4px",
                                         fontSize: "9px",
                                         fontWeight: 700,
                                         color: "#9ca3af",
                                         textTransform: "uppercase",
                                       }}
                                     >
-                                      💡 AI Recommendation
+                                      <Lightbulb size={10} />
+                                      AI Recommendation
                                     </span>
-                                    <CopyButton
-                                      text={item.suggestion}
-                                      style={{ padding: "2px" }}
-                                    />
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        gap: "2px",
+                                      }}
+                                    >
+                                      <QuickFixButton
+                                        text={item.suggestion}
+                                        onApply={(code) => {
+                                          navigator.clipboard.writeText(code);
+                                          addToast("AI fix applied! Code copied to clipboard.");
+                                        }}
+                                      />
+                                      <CopyButton
+                                        text={item.suggestion}
+                                        style={{ padding: "2px" }}
+                                      />
+                                    </div>
                                   </div>
                                   <code
                                     style={{
@@ -3970,6 +4839,17 @@ export default function App() {
                     </div>
 
                     {/* Chat Input form */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#9ca3af", cursor: "pointer", whiteSpace: "nowrap" }}>
+                        <input
+                          type="checkbox"
+                          checked={useRag}
+                          onChange={(e) => setUseRag(e.target.checked)}
+                          style={{ accentColor: "#a855f7" }}
+                        />
+                        Chat with Repository
+                      </label>
+                    </div>
                     <form
                       onSubmit={handleSendChatMessage}
                       style={{

@@ -1,8 +1,9 @@
 import React from 'react';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
+// Dummy Data to be replaced with actual API response
 const dummyData = [
   { month: 'Jan', bugs: 12, security: 4 },
   { month: 'Feb', bugs: 8, security: 2 },
