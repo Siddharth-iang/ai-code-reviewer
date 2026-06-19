@@ -2,10 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import SettingsModal from "./components/SettingsModal";
 import { MetricsChart } from './components/MetricsChart';
+import RepositoryOverview from './RepositoryOverview';
+import RepositorySummaryCard from './RepositorySummaryCard';
+import HealthScoreGauge from './components/HealthScoreGauge';
+import TotalIssuesKpiCard from './components/TotalIssuesKpiCard';
 import {
   Github,
   Terminal,
   ShieldAlert,
+  Lightbulb,
   Zap,
   Sparkles,
   Bug,
