@@ -1,8 +1,17 @@
 import * as vscode from "vscode";
+import { RepoSageWebviewProvider } from "./webviewProvider";
 import { reviewFileContent } from "./api";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("RepoSage extension is now active!");
+
+  const provider = new RepoSageWebviewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      RepoSageWebviewProvider.viewType,
+      provider
+    )
+  );
 
   const disposable = vscode.commands.registerCommand(
     "reposage.reviewCurrentFile",
@@ -19,6 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
       const fileName = document.fileName;
       const fileContent = document.getText();
 
+      provider.setLoading(true);
       vscode.window.showInformationMessage(
         `RepoSage: Reviewing ${fileName}...`
       );
@@ -27,14 +37,17 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (result.success) {
         console.log("RepoSage review result:", result.response);
+        provider.setContent(result.response || "");
         vscode.window.showInformationMessage(
-          "RepoSage review complete! Check the console for details."
+          "RepoSage review complete! Check the sidebar for details."
         );
       } else {
+        provider.setError(result.error || "Unknown error");
         vscode.window.showErrorMessage(
           `RepoSage review failed: ${result.error}`
         );
       }
+      provider.setLoading(false);
     }
   );
 
