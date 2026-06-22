@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 
@@ -11,10 +11,13 @@ let connectShouldSucceed = false;
 mongoose.connect = async (uri, options) => {
   connectCallCount++;
   if (connectShouldSucceed) {
-    return originalConnect.call(mongoose, uri, options);
+    return Promise.resolve({ mockConnection: true });
   }
   throw new Error('Mock connection refused');
 };
+
+const originalDisconnect = mongoose.disconnect;
+mongoose.disconnect = async () => {};
 
 // Re-import config after mocking so it picks up the mocked mongoose
 const { isDatabaseConnected, closeDatabase } = await import('../config/db.js');
@@ -70,7 +73,8 @@ test('ensureConnection returns true when DB connects successfully', async () => 
   connectShouldSucceed = false;
 });
 
-test.afterAll(async () => {
+after(async () => {
   mongoose.connect = originalConnect;
+  mongoose.disconnect = originalDisconnect;
   await closeDatabase();
 });
