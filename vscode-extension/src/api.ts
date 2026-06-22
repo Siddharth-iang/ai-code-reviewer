@@ -28,7 +28,6 @@ export interface BackendResponse {
   success: boolean;
   analysis: AnalysisData;
 }
-
 function getConfig() {
   const config = vscode.workspace.getConfiguration("reposage");
   const apiUrl = config.get<string>("apiUrl", "http://localhost:5000");
@@ -72,7 +71,7 @@ export async function reviewFileContent(
     }
 
     const data = await response.json();
-    return { success: true, response: JSON.stringify(data) };
+    return { success: true, response: JSON.stringify(data, null, 2) };
   } catch (err: any) {
     return {
       success: false,
