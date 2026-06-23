@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SidebarLayout from './layouts/SidebarLayout';
 import Dashboard from './pages/Dashboard';
 
-function QuickFixButton({ text, onApply }: { text: string; onApply: (text: string) => void }) {
+export function QuickFixButton({ text, onApply }: { text: string; onApply: (text: string) => void }) {
   const [open, setOpen] = useState(false);
   const [applied, setApplied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
