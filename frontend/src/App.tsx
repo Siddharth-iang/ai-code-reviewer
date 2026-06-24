@@ -110,4 +110,4 @@ export default function App() {
         </BrowserRouter>
     );
 }
-// resolving conflicts
+// resolving conflicts\n// TODO: Issue #499 - Security: CSS Sanitizer Allows Malicious Data URIs\n
