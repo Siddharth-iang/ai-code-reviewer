@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 export interface ReviewResponse {
   success: boolean;
   response?: string;
+  data?: BackendResponse;
   error?: string;
 }
 
@@ -71,9 +72,13 @@ export async function reviewFileContent(
       };
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as BackendResponse;
     console.log("RepoSage API response:", data);
-    return { success: true, response: JSON.stringify(data, null, 2) };
+    return {
+      success: true,
+      response: JSON.stringify(data, null, 2),
+      data,
+    };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("RepoSage API fetch failed:", err);
