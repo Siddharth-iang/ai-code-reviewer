@@ -36,7 +36,7 @@ def _redact_key(text: str, key: str) -> str:
 ALLOWED_TAGS = [
     'svg', 'g', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon',
     'text', 'tspan', 'defs', 'clipPath', 'mask', 'linearGradient',
-    'radialGradient', 'stop', 'marker', 'a', 'title', 'desc',
+    'radialGradient', 'stop', 'marker', 'a', 'title', 'desc', 'animate',
     'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'hr',
     'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
@@ -60,6 +60,7 @@ ALLOWED_ATTRS = {
     'clipPath': ['id'],
     'mask': ['id'],
     'marker': ['id', 'viewBox', 'refX', 'refY', 'markerWidth', 'markerHeight'],
+    'animate': ['attributeName', 'values', 'dur', 'repeatCount'],
     'td': ['colspan', 'rowspan'],
     'th': ['colspan', 'rowspan'],
 }
@@ -151,10 +152,8 @@ def validate_system_prompt(prompt: str, max_len: int = 2000) -> str:
         escaped = re.escape(phrase)
         pattern = escaped.replace(r"\ ", r"\s+")
         if re.search(pattern, lower):
-            raise HTTPException(
-                status_code=400,
-                detail="System prompt contains prohibited directives and was rejected."
-            )
+            truncated = re.sub(pattern, "", truncated, flags=re.IGNORECASE)
+            lower = truncated.lower()
     return truncated
 app = FastAPI(title="RepoSage AI Engine", description="FastAPI microservice for repository analysis and documentation generation")
 
