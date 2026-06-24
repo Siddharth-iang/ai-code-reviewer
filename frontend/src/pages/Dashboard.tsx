@@ -52,6 +52,18 @@ try {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 let sessionRequest: Promise<void> | null = null;
 
+const getSavedAiSettings = () => {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem("reposage_ai_settings") || "{}"
+    );
+    return saved && typeof saved === "object" ? saved : {};
+  } catch (error) {
+    console.warn("Invalid saved AI settings; using defaults.", error);
+    return {};
+  }
+};
+
 const ensureApiSession = async () => {
   if (!sessionRequest) {
     sessionRequest = fetch(`${API_BASE_URL}/api/session`, {
@@ -893,11 +905,8 @@ export default function Dashboard() {
         setLoadingStep(steps[currentStep]);
       }
     }, 1200);
-    const aiSettings = JSON.parse(
-      localStorage.getItem("reposage_ai_settings") || "{}"
-    );
-
     try {
+      const aiSettings = getSavedAiSettings();
       const response = await apiFetch("/api/analyze", {
         method: "POST",
         body: JSON.stringify({
