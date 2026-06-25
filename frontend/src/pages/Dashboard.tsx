@@ -130,6 +130,7 @@ interface BackendResponse {
   filesReviewedCount: number;
   analysis: AnalysisData;
   sessionId?: string;
+  sessionPersisted?: boolean;
 }
 
 interface AuditHistoryEntry {
@@ -911,8 +912,10 @@ export default function Dashboard() {
 
       const data: BackendResponse = await response.json();
       setAnalysisResult(data);
-      if (data.sessionId) {
+      if (data.sessionId && data.sessionPersisted !== false) {
         setSessionId(data.sessionId);
+      } else if (data.sessionId && data.sessionPersisted === false) {
+        setSessionId(null);
       }
       persistAuditHistory(data);
       setChatHistory([]);
