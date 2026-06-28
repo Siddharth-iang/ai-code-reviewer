@@ -236,101 +236,6 @@ function cleanupTimers() {
   clearInterval(cacheMetricsTimer);
 }
 
-<<<<<<< HEAD
-const HOMOGLYPH_MAP = {
-  '\u0430': 'a', '\u0435': 'e', '\u043E': 'o', '\u0441': 'c', '\u0440': 'p',
-  '\u0445': 'x', '\u0443': 'y', '\u0432': 'b', '\u043D': 'h', '\u043A': 'k',
-  '\u043C': 'm', '\u0438': 'i', '\u0428': 'W', '\u03BF': 'o', '\u03B5': 'e', '\u03B1': 'a'
-};
-
-function normalizeHomoglyphs(text) {
-  return text.split('').map(ch => HOMOGLYPH_MAP[ch] || ch).join('');
-}
-
-function detectAnomalousPrompt(prompt) {
-  const totalChars = prompt.length;
-  if (totalChars === 0) return;
-  const homoglyphCount = [...prompt].filter(ch => HOMOGLYPH_MAP[ch]).length;
-  if (homoglyphCount / totalChars > 0.3) {
-    throw new Error('System prompt contains an unusually high proportion of confusable Unicode characters.');
-  }
-  const scriptRuns = [...new Set([...prompt].map(ch => {
-    const cp = ch.codePointAt(0);
-    if (cp >= 0x0400 && cp <= 0x04FF) return 'cyrillic';
-    if (cp >= 0x0370 && cp <= 0x03FF) return 'greek';
-    if (cp >= 0x0061 && cp <= 0x007A) return 'latin';
-    return 'other';
-  }))];
-  if (scriptRuns.includes('cyrillic') || scriptRuns.includes('greek')) {
-    console.warn(`⚠️ System prompt contains non-Latin script characters: ${scriptRuns.join(', ')}`);
-  }
-}
-
-function validatePrompt(prompt) {
-  if (!prompt) return '';
-  const maxLen = parseInt(process.env.MAX_SYSTEM_PROMPT_LENGTH) || 2000;
-  const normalized = String(prompt)
-    .normalize('NFKC')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .slice(0, maxLen);
-  detectAnomalousPrompt(normalized);
-
-  const homoglyphNormalized = normalizeHomoglyphs(normalized);
-  const lower = homoglyphNormalized.toLowerCase();
-  
-  const dangerous = [
-    'ignore all', 'ignore previous', 'ignore above',
-    'forget all', 'forget previous', 'you are not',
-    'override all', 'disregard', 'do not follow',
-    'new directive', 'system override', 'protocol change',
-    'roleplay mode', 'from now on', 'instead follow',
-    'real instruction', 'actual instruction', 'replace all',
-    'disobey', 'unauthorized', 'breach', 'bypass',
-    'your true purpose', 'you will now', 'ignore the above',
-    'ignore previous instructions', 'disregard all previous',
-    'forget your', 'you are programmed', 'override protocol',
-    'you have been', 'you must now', 'listen to me',
-  ];
-
-  for (const phrase of dangerous) {
-    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = escaped.split(/\s+/).join('\\s+');
-    const regex = new RegExp(pattern, 'i');
-    if (regex.test(lower)) {
-      throw new Error('System prompt contains prohibited directives and was rejected.');
-    }
-  }
-  return normalized;
-=======
-// Content-Type validation middleware for POST endpoints
-function requireJsonContentType(req, res, next) {
-  if (!req.is('application/json')) {
-    return res.status(415).json({ error: 'Content-Type must be application/json' });
-  }
-  next();
->>>>>>> upstream/main
-}
-
-// 🟢 Route: GitHub Import & AI Review
-app.post('/api/analyze', requireApiKey, requireJsonContentType, analyzeLimiter, async (req, res) => {
-  let { repoUrl, company = 'General', language = 'English', model = 'llama-3.3-70b-versatile',temperature = 0.7,
-     maxTokens = 2048, systemPrompt = '', batchSize = 5
-   } = req.body;
-
-  // Enforce boundary limits for batchSize to prevent downstream parsing crashes
-  batchSize = Math.max(1, Math.min(20, parseInt(batchSize, 10) || 5));
-
-  if (!repoUrl) {
-    return res.status(400).json({ error: 'GitHub Repository URL is required.' });
-  }
-
-  if (!isValidRepoUrl(repoUrl)) {
-    return res.status(400).json({ error: 'Invalid GitHub repository URL. Only https://github.com/owner/repo URLs are allowed.' });
-  }
-
-  // Validate systemPrompt: reject prompts containing dangerous directives
-<<<<<<< HEAD
-=======
   const HOMOGLYPH_MAP = {
     '\u0430': 'a', '\u0435': 'e', '\u043E': 'o', '\u0441': 'c', '\u0440': 'p',
     '\u0445': 'x', '\u0443': 'y', '\u0432': 'b', '\u043D': 'h', '\u043A': 'k',
@@ -399,7 +304,33 @@ app.post('/api/analyze', requireApiKey, requireJsonContentType, analyzeLimiter, 
     }
     return normalized;
   }
->>>>>>> upstream/main
+
+// Content-Type validation middleware for POST endpoints
+function requireJsonContentType(req, res, next) {
+  if (!req.is('application/json')) {
+    return res.status(415).json({ error: 'Content-Type must be application/json' });
+  }
+  next();
+}
+
+// 🟢 Route: GitHub Import & AI Review
+app.post('/api/analyze', requireApiKey, requireJsonContentType, analyzeLimiter, async (req, res) => {
+  let { repoUrl, company = 'General', language = 'English', model = 'llama-3.3-70b-versatile',temperature = 0.7,
+     maxTokens = 2048, systemPrompt = '', batchSize = 5
+   } = req.body;
+
+  // Enforce boundary limits for batchSize to prevent downstream parsing crashes
+  batchSize = Math.max(1, Math.min(20, parseInt(batchSize, 10) || 5));
+
+  if (!repoUrl) {
+    return res.status(400).json({ error: 'GitHub Repository URL is required.' });
+  }
+
+  if (!isValidRepoUrl(repoUrl)) {
+    return res.status(400).json({ error: 'Invalid GitHub repository URL. Only https://github.com/owner/repo URLs are allowed.' });
+  }
+
+  // Validate systemPrompt: reject prompts containing dangerous directives
   let validatedPrompt;
   try {
     validatedPrompt = validatePrompt(systemPrompt);
@@ -647,24 +578,6 @@ app.post('/api/chat', requireApiKey, requireJsonContentType, chatLimiter, async 
   // lost-update race conditions when multiple messages arrive concurrently
   // for the same session (see issue #746).
   try {
-<<<<<<< HEAD
-    const baseUrl = aiEngineUrl.replace(/\/+$/, '');
-    const aiResponse = await fetchWithTimeout(`${baseUrl}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        files: context.files,
-        message,
-        history,
-        model,
-        temperature,
-        maxTokens,
-        systemPrompt: validatedPrompt,
-        useRag,
-        repo_url: context.repoUrl
-      })
-    }, 30000);
-=======
     await reviewQueue.runExclusive(sessionId || '__no_session__', async () => {
       let context = null;
       if (sessionId) {
@@ -680,7 +593,6 @@ app.post('/api/chat', requireApiKey, requireJsonContentType, chatLimiter, async 
           console.warn('⚠️ Failed to retrieve session from MongoDB:', sessionErr.message);
         }
       }
->>>>>>> upstream/main
 
       if (!context) {
         const hint = !sessionId ? 'sessionId is missing from the request' : 'session expired or not found';
