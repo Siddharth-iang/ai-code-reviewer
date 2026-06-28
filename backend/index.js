@@ -552,6 +552,7 @@ app.post('/api/analyze', requireApiKey, requireJsonContentType, analyzeLimiter, 
         filesReviewedCount: files.length,
         analysis: reviewResult,
         sessionId,
+        chatAvailable: sessionPersisted,
         sessionPersisted
       });
 
